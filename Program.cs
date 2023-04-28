@@ -41,11 +41,12 @@ internal static class Program
         {
             if (node.GetValue(GraphicsSettingsModelKeyName) is byte[] rawBytes)
             {
-                GraphicsSettings graphicsSettings = JsonSerializer.Deserialize(rawBytes, GraphicsSettingsContext.Default.GraphicsSettings)!;
+                // take away the null terminator
+                GraphicsSettings graphicsSettings = JsonSerializer.Deserialize(rawBytes.AsSpan()[..^1], GraphicsSettingsContext.Default.GraphicsSettings)!;
                 graphicsSettings.Fps = 120;
 
-                string result = JsonSerializer.Serialize(graphicsSettings, GraphicsSettingsContext.Default.GraphicsSettings);
-                node.SetValue(GraphicsSettingsModelKeyName, Encoding.UTF8.GetBytes(result), RegistryValueKind.Binary);
+                string output = JsonSerializer.Serialize(graphicsSettings, GraphicsSettingsContext.Default.GraphicsSettings);
+                node.SetValue(GraphicsSettingsModelKeyName, Encoding.UTF8.GetBytes(output), RegistryValueKind.Binary);
                 ReadLine("设置完成");
             }
             else
