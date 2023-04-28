@@ -1,70 +1,68 @@
 ﻿using Microsoft.Win32;
-using Newtonsoft.Json.Linq;
 using System;
-using System.Collections.Generic;
-using System.Diagnostics.Contracts;
-using System.Linq;
+using System.CommandLine;
+using System.Runtime.CompilerServices;
 using System.Text;
-using System.Threading.Tasks;
+using System.Text.Json;
 
-namespace StarRailUnlock120
+namespace StarRail.FpsUnlocker;
+
+internal static class Program
 {
-    internal class Program
+    private const string GraphicsSettingsModelKeyName = "GraphicsSettings_Model_h2986158309";
+
+    public static void Main(string[] args)
     {
-        public static void Main()
+        RootCommand rootCommand = new("崩坏：星穹铁道 帧率解锁");
+        Option<RegionType> regionOption = new("--region", "游玩的服务器 (默认 CN 国服)");
+        rootCommand.AddOption(regionOption);
+
+        rootCommand.SetHandler(SetRegistryValueFps, regionOption);
+
+        rootCommand.Invoke(args);
+    }
+
+    private static void SetRegistryValueFps(RegionType region)
+    {
+        string subKeyPath = region switch
         {
-            var node = Registry.CurrentUser.OpenSubKey("Software")?.OpenSubKey("miHoYo")?.OpenSubKey("崩坏：星穹铁道", true);
-            if (node == null)
-            {
-                Console.WriteLine("打开国服注册表失败，请尝试至少在游戏中修改一次图形设置并关闭设置界面");
-                Console.ReadLine();
-                return;
-            }
-            var keyName = node.GetValueNames().FirstOrDefault(x => x.StartsWith("GraphicsSettings_Model"));
-            if (keyName == default)
-            {
-                Console.WriteLine("获取国服注册表内容失败，请尝试至少在游戏中修改一次图形设置并关闭设置界面");
-                Console.ReadLine();
-                return;
-            }
-            var key = node.GetValue(keyName);
-            if (key == null)
-            {
-                Console.WriteLine("获取国服注册表内容失败，请尝试至少在游戏中修改一次图形设置并关闭设置界面");
-                Console.ReadLine();
-                return;
-            }
-            var value = Encoding.UTF8.GetString((byte[])key);
-            var json = JObject.Parse(value);
-            json["FPS"] = 120;
-            node.SetValue(keyName, Encoding.UTF8.GetBytes(json.ToString(Newtonsoft.Json.Formatting.None)));
-            Console.WriteLine("国服设置完成");
+            RegionType.CN => @"Software\miHoYo\崩坏：星穹铁道",
+            RegionType.OS => @"Software\Cognosphere\Star Rail",
+            _ => string.Empty,
+        };
 
-            var intlNode = Registry.CurrentUser.OpenSubKey("Software")?.OpenSubKey("Cognosphere")?.OpenSubKey("Star Rail", true);
-            if (intlNode != null)
-            {
-                var intlKeyName = intlNode.GetValueNames().FirstOrDefault(x => x.StartsWith("GraphicsSettings_Model"));
-                if (intlKeyName == null)
-                {
-                    Console.WriteLine("获取国际服注册表内容失败，请尝试至少在游戏中修改一次图形设置并关闭设置界面");
-                    Console.ReadLine();
-                    return;
-                }
-                var intlKey = intlNode.GetValue(intlKeyName);
-                if (intlKey == null)
-                {
-                    Console.WriteLine("获取国际服注册表内容失败，请尝试至少在游戏中修改一次图形设置并关闭设置界面");
-                    Console.ReadLine();
-                    return;
-                }
-                var intlValue = Encoding.UTF8.GetString((byte[])intlKey);
-                var intlJson = JObject.Parse(intlValue);
-                intlJson["FPS"] = 120;
-                intlNode.SetValue(intlKeyName, Encoding.UTF8.GetBytes(intlJson.ToString(Newtonsoft.Json.Formatting.None)));
-                Console.WriteLine("国际服设置完成");
-            }
-
-            Console.ReadLine();
+        if(string.IsNullOrEmpty(subKeyPath) )
+        {
+            ReadLine("请指定 --region 参数");
+            return;
         }
+
+        if (Registry.CurrentUser.OpenSubKey(subKeyPath, true) is RegistryKey node)
+        {
+            if (node.GetValue(GraphicsSettingsModelKeyName) is byte[] rawBytes)
+            {
+                GraphicsSettings graphicsSettings = JsonSerializer.Deserialize(rawBytes, GraphicsSettingsContext.Default.GraphicsSettings)!;
+                graphicsSettings.Fps = 120;
+
+                string result = JsonSerializer.Serialize(graphicsSettings, GraphicsSettingsContext.Default.GraphicsSettings);
+                node.SetValue(GraphicsSettingsModelKeyName, Encoding.UTF8.GetBytes(result), RegistryValueKind.Binary);
+                ReadLine("设置完成");
+            }
+            else
+            {
+                ReadLine("获取注册表值失败，请尝试在游戏中修改一次图形设置并关闭设置界面");
+            }
+        }
+        else
+        {
+            ReadLine("打开注册表键失败，请尝试在游戏中修改一次图形设置并关闭设置界面");
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void ReadLine(string hint)
+    {
+        Console.WriteLine(hint);
+        _ = Console.ReadLine();
     }
 }
