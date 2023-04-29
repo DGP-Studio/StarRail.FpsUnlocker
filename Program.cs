@@ -10,6 +10,7 @@ namespace StarRail.FpsUnlocker;
 internal static class Program
 {
     private const string GraphicsSettingsModelKeyName = "GraphicsSettings_Model_h2986158309";
+    private const byte NullTerminator = 0x0;
 
     public static void Main(string[] args)
     {
@@ -19,7 +20,8 @@ internal static class Program
 
         rootCommand.SetHandler(SetRegistryValueFps, regionOption);
 
-        rootCommand.Invoke(args);
+        _ = rootCommand.Invoke(args);
+        ReadLine("按任意键退出");
     }
 
     private static void SetRegistryValueFps(RegionType region)
@@ -42,7 +44,8 @@ internal static class Program
             if (node.GetValue(GraphicsSettingsModelKeyName) is byte[] rawBytes)
             {
                 // take away the null terminator
-                GraphicsSettings graphicsSettings = JsonSerializer.Deserialize(rawBytes.AsSpan()[..^1], GraphicsSettingsContext.Default.GraphicsSettings)!;
+                Span<byte> data = rawBytes.AsSpan().TrimEnd(NullTerminator);
+                GraphicsSettings graphicsSettings = JsonSerializer.Deserialize(data, GraphicsSettingsContext.Default.GraphicsSettings)!;
                 graphicsSettings.Fps = 120;
 
                 string output = JsonSerializer.Serialize(graphicsSettings, GraphicsSettingsContext.Default.GraphicsSettings);
